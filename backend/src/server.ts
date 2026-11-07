@@ -55,19 +55,11 @@ app.post('/api/workspace/set', (req, res) => {
 
 // Native Windows / System Folder Picker Dialog Endpoint
 app.post('/api/workspace/pick-dialog', (req, res) => {
-  // Use PowerShell to trigger the native Windows folder picker
-  const psCommand = `
-    Add-Type -AssemblyName System.Windows.Forms
-    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dialog.Description = "Select Folder for Antigravity IDE Workspace"
-    $dialog.ShowNewFolderButton = $true
-    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-      [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-      Write-Output $dialog.SelectedPath
-    }
-  `.replace(/\r?\n\s*/g, ' ');
+  const scriptPath = path.resolve(__dirname, '../pick-folder.ps1');
+  const fallbackScript = path.resolve(process.cwd(), 'backend/pick-folder.ps1');
+  const targetScript = fs.existsSync(scriptPath) ? scriptPath : fallbackScript;
 
-  exec(`powershell -NoProfile -Command "${psCommand}"`, (error, stdout) => {
+  exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${targetScript}"`, (error, stdout) => {
     const selected = (stdout || '').trim();
     if (!selected || !fs.existsSync(selected)) {
       return res.json({ canceled: true });
