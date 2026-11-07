@@ -1,0 +1,33 @@
+{
+  "lastOpenedProject": ".",
+  "openTabs": [],
+  "activeTabPath": null,
+  "conversations": [
+    {
+      "id": "msg-welcome",
+      "role": "assistant",
+      "content": "Hello! I am your **Antigravity AI Agent**.\n\nI can inspect directories, read and write files across the workspace, execute terminal commands, and fix bugs autonomously.\n\nType your task below to get started!",
+      "timestamp": 1794062635488
+    },
+    {
+      "id": "msg-1794062654111",
+      "role": "user",
+      "content": "hi",
+      "timestamp": 1794062654111
+    },
+    {
+      "id": "msg-1794062654112",
+      "role": "assistant",
+      "content": "",
+      "timestamp": 1794062654111,
+      "isStreaming": true,
+      "toolCalls": [],
+      "plan": []
+    }
+  ],
+  "settings": {
+    "provider": "gemini",
+    "model": "gemini-3.8-flash",
+    "temperature": 0.2
+  }
+}

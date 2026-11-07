@@ -10,6 +10,7 @@ interface IdeState {
   setFiles: (files: FileItem[]) => void;
   setProject: (name: string, path: string) => void;
   loadWorkspaceFiles: () => Promise<void>;
+  restoreSession: () => Promise<void>;
 
   // Editor Tabs
   openTabs: OpenTab[];
@@ -25,9 +26,9 @@ interface IdeState {
   setActiveSidebarView: (view: 'files' | 'search' | 'git' | 'settings' | 'history') => void;
 
   // Bottom Panel
-  bottomPanelTab: 'terminal' | 'problems' | 'output' | 'agent-logs';
+  bottomPanelTab: 'terminal' | 'problems' | 'output' | 'agent-logs' | 'ports' | 'comments' | 'debug';
   isBottomPanelOpen: boolean;
-  setBottomPanelTab: (tab: 'terminal' | 'problems' | 'output' | 'agent-logs') => void;
+  setBottomPanelTab: (tab: any) => void;
   toggleBottomPanel: () => void;
 
   // AI & Agent
@@ -54,12 +55,37 @@ interface IdeState {
 const savedApiKey = typeof window !== 'undefined' ? localStorage.getItem('codepilot_api_key') || '' : '';
 const savedOllamaEndpoint = typeof window !== 'undefined' ? localStorage.getItem('codepilot_ollama_endpoint') || 'http://localhost:11434' : 'http://localhost:11434';
 
+const syncSession = (data: Record<string, any>) => {
+  fetch('/api/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+};
+
 export const useIdeStore = create<IdeState>((set, get) => ({
   projectPath: '.',
-  projectName: 'workspace',
+  projectName: 'Shadity',
   files: [],
   setFiles: (files) => set({ files }),
-  setProject: (name, path) => set({ projectName: name, projectPath: path }),
+  setProject: (name, path) => {
+    set({ projectName: name, projectPath: path });
+    syncSession({ lastOpenedProject: path });
+  },
+
+  restoreSession: async () => {
+    try {
+      const res = await fetch('/api/session');
+      if (res.ok) {
+        const session = await res.json();
+        if (session.openTabs && session.openTabs.length > 0) {
+          for (const tab of session.openTabs) {
+            get().openFile(tab);
+          }
+        }
+      }
+    } catch {}
+  },
 
   loadWorkspaceFiles: async () => {
     try {
@@ -80,7 +106,7 @@ export const useIdeStore = create<IdeState>((set, get) => ({
         set({ files: parsedFiles });
       }
     } catch {
-      // Keep existing files if backend isn't connected yet
+      // Keep existing
     }
   },
 
@@ -132,7 +158,14 @@ export const useIdeStore = create<IdeState>((set, get) => ({
       isModified: false,
     };
 
-    set({ openTabs: [...openTabs, newTab], activeTabId: newTab.id });
+    const nextTabs = [...openTabs, newTab];
+    set({ openTabs: nextTabs, activeTabId: newTab.id });
+
+    // Sync session tabs to backend database
+    syncSession({
+      openTabs: nextTabs.map(t => ({ path: t.path, name: t.name })),
+      activeTabPath: newTab.path,
+    });
   },
 
   closeTab: (id) => {
@@ -143,6 +176,10 @@ export const useIdeStore = create<IdeState>((set, get) => ({
       nextActive = nextTabs.length > 0 ? nextTabs[nextTabs.length - 1].id : null;
     }
     set({ openTabs: nextTabs, activeTabId: nextActive });
+
+    syncSession({
+      openTabs: nextTabs.map(t => ({ path: t.path, name: t.name })),
+    });
   },
 
   setActiveTab: (id) => set({ activeTabId: id }),
@@ -188,7 +225,7 @@ export const useIdeStore = create<IdeState>((set, get) => ({
 
   modelConfig: {
     provider: 'gemini',
-    model: 'gemini-1.5-pro',
+    model: 'antigravity-local',
     apiKey: savedApiKey,
     endpointUrl: savedOllamaEndpoint,
     temperature: 0.2,
@@ -202,11 +239,17 @@ export const useIdeStore = create<IdeState>((set, get) => ({
     {
       id: 'msg-welcome',
       role: 'assistant',
-      content: 'Hello! I am **CodePilot Agent**, your autonomous coding partner inspired by Antigravity.\n\nI have tool access to inspect directories, read and write files, run terminal commands, and fix bugs autonomously.\n\nType your task below to get started!',
+      content: 'Hello! I am your **Antigravity AI Agent**.\n\nI can inspect directories, read and write files across the workspace, execute terminal commands, and fix bugs autonomously.\n\nType your task below to get started!',
       timestamp: Date.now(),
     }
   ],
-  addMessage: (msg) => set(state => ({ messages: [...state.messages, msg] })),
+  addMessage: (msg) => {
+    set(state => {
+      const nextMsgs = [...state.messages, msg];
+      syncSession({ conversations: nextMsgs.slice(-10) });
+      return { messages: nextMsgs };
+    });
+  },
   updateLastMessage: (updater) => set(state => {
     if (state.messages.length === 0) return state;
     const msgs = [...state.messages];
@@ -229,7 +272,7 @@ export const useIdeStore = create<IdeState>((set, get) => ({
   })),
 
   terminalLogs: [
-    'CodePilot IDE Environment v1.0.0 initialized.',
+    'Antigravity IDE Environment initialized.',
     'Ready for terminal execution and autonomous tool invocation.'
   ],
   addTerminalLog: (log) => set(state => ({ terminalLogs: [...state.terminalLogs, log] }))

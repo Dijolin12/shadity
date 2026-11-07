@@ -1,26 +1,54 @@
 {
-  "name": "codepilot-ai-ide",
+  "name": "antigravity-ai-ide",
   "version": "1.0.0",
-  "description": "Antigravity & Gemini inspired AI-powered Autonomous Coding IDE",
+  "description": "Antigravity & Gemini inspired AI-powered Autonomous Coding Desktop IDE",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
     "dev:frontend": "npm.cmd --prefix frontend run dev",
     "dev:backend": "npm.cmd --prefix backend run dev",
     "dev": "concurrently \"npm.cmd --prefix backend run dev\" \"npm.cmd --prefix frontend run dev\"",
+    "build:frontend": "npm.cmd --prefix frontend run build",
+    "build:backend": "npm.cmd --prefix backend run build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "electron:dev": "npm.cmd run build:electron && electron .",
-    "build": "npm.cmd --prefix frontend run build && npm.cmd --prefix backend run build && npm.cmd run build:electron"
+    "build": "npm run build:frontend && npm run build:backend && npm run build:electron",
+    "start": "npm run build:electron && electron .",
+    "dist": "npm run build && electron-builder --win"
   },
   "keywords": [
     "ai-ide",
     "antigravity",
     "gemini",
     "monaco",
-    "agentic-coding"
+    "agentic-coding",
+    "electron"
   ],
-  "author": "CodePilot AI",
+  "author": "Antigravity AI",
   "license": "MIT",
+  "build": {
+    "appId": "com.antigravity.ide",
+    "productName": "Antigravity IDE",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "frontend/dist/**/*",
+      "backend/dist/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.13.4",
     "concurrently": "^9.1.2",

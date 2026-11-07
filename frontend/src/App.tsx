@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
+import { AntigravityHeader } from './components/AntigravityHeader';
 import { Sidebar } from './components/Sidebar';
 import { FileTree } from './components/FileTree';
+import { SearchPanel } from './components/SearchPanel';
 import { EditorArea } from './components/EditorArea';
 import { AgentPanel } from './components/AgentPanel';
 import { TerminalPanel } from './components/TerminalPanel';
@@ -10,16 +11,21 @@ import { CommandPalette } from './components/CommandPalette';
 import { GitPanel } from './components/GitPanel';
 import { DebugModal } from './components/DebugModal';
 import { ProjectWizardModal } from './components/ProjectWizardModal';
+import { ReviewModal } from './components/ReviewModal';
 import { useIdeStore } from './stores/useIdeStore';
 
 export const App: React.FC = () => {
-  const { activeSidebarView, setActiveSidebarView } = useIdeStore();
+  const { activeSidebarView, setActiveSidebarView, restoreSession } = useIdeStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
   const [isProjectWizardOpen, setIsProjectWizardOpen] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   useEffect(() => {
+    // Restore tabs and workspace state on load
+    restoreSession();
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+P: Command palette
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
@@ -40,10 +46,48 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [restoreSession]);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-ide-bg text-ide-text overflow-hidden select-none">
+    <div className="flex flex-col h-screen w-screen bg-[#1e1e1e] text-[#cccccc] overflow-hidden select-none font-sans">
+      {/* Top Application Title & Menu Bar */}
+      <AntigravityHeader 
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+      />
+
+      {/* Main Workspace Body */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Left Activity Bar */}
+        <Sidebar />
+
+        {/* File Explorer */}
+        {activeSidebarView === 'files' && (
+          <FileTree onOpenProjectWizard={() => setIsProjectWizardOpen(true)} />
+        )}
+
+        {/* Real Codebase Search Panel */}
+        {activeSidebarView === 'search' && <SearchPanel />}
+
+        {/* Git Source Control Panel */}
+        {activeSidebarView === 'git' && <GitPanel />}
+
+        {/* Center Canvas: Monaco Code Editor + Bottom Antigravity Terminal */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+          <EditorArea />
+          <TerminalPanel onOpenDebugger={() => setIsDebugModalOpen(true)} />
+        </div>
+
+        {/* Right Pane: Antigravity Agent Panel */}
+        <AgentPanel onOpenReview={() => setIsReviewOpen(true)} />
+      </div>
+
+      {/* Interactive Review Modal */}
+      <ReviewModal
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+      />
+
       {/* Settings Modal */}
       <SettingsModal 
         isOpen={isSettingsOpen || activeSidebarView === 'settings'} 
@@ -71,44 +115,6 @@ export const App: React.FC = () => {
         isOpen={isProjectWizardOpen}
         onClose={() => setIsProjectWizardOpen(false)}
       />
-
-      {/* Top Header */}
-      <Header />
-
-      {/* Main Workspace Body */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Far-left Activity Bar */}
-        <Sidebar />
-
-        {/* File Explorer */}
-        {activeSidebarView === 'files' && (
-          <FileTree onOpenProjectWizard={() => setIsProjectWizardOpen(true)} />
-        )}
-
-        {/* Git Source Control Panel */}
-        {activeSidebarView === 'git' && <GitPanel />}
-
-        {/* Search Left Pane */}
-        {activeSidebarView === 'search' && (
-          <div className="w-60 bg-ide-panel border-r border-ide-border p-3 text-xs text-ide-muted">
-            <span className="font-semibold text-white">Search</span>
-            <input 
-              type="text" 
-              placeholder="Search across files..." 
-              className="w-full mt-2 bg-ide-bg border border-ide-border rounded px-2 py-1 text-white text-xs focus:outline-none" 
-            />
-          </div>
-        )}
-
-        {/* Center Canvas: Monaco Code Editor + Bottom Terminal */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
-          <EditorArea />
-          <TerminalPanel onOpenDebugger={() => setIsDebugModalOpen(true)} />
-        </div>
-
-        {/* Right Pane: Autonomous Antigravity Agent Panel */}
-        <AgentPanel />
-      </div>
     </div>
   );
 };

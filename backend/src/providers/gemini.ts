@@ -93,27 +93,22 @@ export const AGENT_TOOLS_DECLARATIONS: any[] = [
 export class GeminiProvider {
   private genAI: GoogleGenerativeAI;
   private modelName: string;
-  private apiKey: string;
 
-  constructor(apiKey: string, modelName: string = 'gemini-2.0-flash') {
-    this.apiKey = apiKey;
+  constructor(apiKey: string, modelName: string = 'gemini-3.8-flash') {
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.modelName = modelName;
   }
 
-  // Active models available across all 2025/2026 Google accounts
   private getCandidateModels(): string[] {
     return [
       this.modelName,
+      'gemini-3.8-flash',
       'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
-      'gemini-1.5-flash-8b',
       'gemini-1.5-flash',
-      'gemini-2.5-flash',
     ].filter(Boolean);
   }
 
-  // Direct text streaming / completion (for commit messages & debugger)
+  // Direct text streaming / completion
   async generateAutonomousResponse(
     systemPrompt: string,
     history: { role: string; content: string }[],
@@ -156,14 +151,15 @@ export class GeminiProvider {
         throw err;
       }
     }
-    throw new Error('All candidate models returned 404.');
+    throw new Error('All candidate models failed.');
   }
 
-  // Native function-calling agent turn with auto-fallback
+  // Real-time Streaming Agent Turn
   async runChatTurn(
     systemPrompt: string,
     history: any[],
-    newPart: any
+    newPart: any,
+    onChunk?: (text: string) => void
   ): Promise<{ text: string; toolCalls: ToolCallItem[] }> {
     const candidateModels = this.getCandidateModels();
 
@@ -182,15 +178,21 @@ export class GeminiProvider {
           },
         });
 
-        const response = await chat.sendMessage(newPart);
-        const candidate = response.response.candidates?.[0];
+        const streamResult = await chat.sendMessageStream(newPart);
 
-        let text = '';
-        try {
-          text = response.response.text();
-        } catch {
-          // Empty text when response is pure function call
+        let fullText = '';
+        for await (const chunk of streamResult.stream) {
+          try {
+            const chunkText = chunk.text();
+            if (chunkText) {
+              fullText += chunkText;
+              onChunk?.(chunkText);
+            }
+          } catch {}
         }
+
+        const finalResponse = await streamResult.response;
+        const candidate = finalResponse.candidates?.[0];
 
         const toolCalls: ToolCallItem[] = [];
         const functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
@@ -203,21 +205,28 @@ export class GeminiProvider {
           }
         }
 
-        return { text, toolCalls };
+        return { text: fullText, toolCalls };
       } catch (err: any) {
-        // If 404 or unsupported on that model name, continue to next modern model
+        console.error(`[Gemini Error on ${modelToTry}]:`, err.message);
         if (err.message?.includes('404') && modelToTry !== candidateModels[candidateModels.length - 1]) {
           continue;
         }
 
-        // Direct fallback: try simple generateContent without tools
+        // Direct fallback: try simple generateContentStream without tools
         try {
-          const fallbackModel = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-          const textResult = await fallbackModel.generateContent(
+          const fallbackModel = this.genAI.getGenerativeModel({ model: modelToTry });
+          const stream = await fallbackModel.generateContentStream(
             typeof newPart === 'string' ? newPart : JSON.stringify(newPart)
           );
-          return { text: textResult.response.text(), toolCalls: [] };
+          let rawText = '';
+          for await (const chunk of stream.stream) {
+            const t = chunk.text();
+            rawText += t;
+            onChunk?.(t);
+          }
+          return { text: rawText, toolCalls: [] };
         } catch {
+          if (modelToTry !== candidateModels[candidateModels.length - 1]) continue;
           throw err;
         }
       }

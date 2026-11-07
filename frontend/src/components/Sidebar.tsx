@@ -4,58 +4,96 @@ import {
   Files, 
   Search, 
   GitBranch, 
-  Clock, 
-  Sliders
+  PlayCircle,
+  LayoutGrid,
+  Settings
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const { activeSidebarView, setActiveSidebarView } = useIdeStore();
 
-  const navItems = [
-    { id: 'files', icon: Files, label: 'Explorer' },
-    { id: 'search', icon: Search, label: 'Search' },
-    { id: 'git', icon: GitBranch, label: 'Source Control' },
-    { id: 'history', icon: Clock, label: 'Timeline & History' },
-  ] as const;
+  const handleNav = (view: 'files' | 'search' | 'git' | 'settings') => {
+    setActiveSidebarView(view);
+  };
 
   return (
-    <aside className="w-12 bg-ide-sidebar border-r border-ide-border flex flex-col justify-between items-center py-2 shrink-0">
+    <aside className="w-12 bg-[#181818] border-r border-[#252526] flex flex-col justify-between items-center py-2 shrink-0 select-none">
       <div className="flex flex-col gap-2">
-        {navItems.map(item => {
-          const Icon = item.icon;
-          const isActive = activeSidebarView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveSidebarView(item.id)}
-              className={`p-2.5 rounded-lg transition relative group ${
-                isActive ? 'text-white bg-ide-active' : 'text-ide-muted hover:text-white hover:bg-ide-hover'
-              }`}
-              title={item.label}
-            >
-              <Icon size={18} />
-              {isActive && (
-                <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-ide-accent rounded-r" />
-              )}
-            </button>
-          );
-        })}
+        {/* Explorer */}
+        <button
+          onClick={() => handleNav('files')}
+          className={`p-2.5 rounded transition relative group ${
+            activeSidebarView === 'files' ? 'text-white' : 'text-[#858585] hover:text-white'
+          }`}
+          title="Explorer (Ctrl+Shift+E)"
+        >
+          <Files size={20} strokeWidth={1.5} />
+          {activeSidebarView === 'files' && (
+            <div className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-white rounded-r" />
+          )}
+        </button>
+
+        {/* Search */}
+        <button
+          onClick={() => handleNav('search')}
+          className={`p-2.5 rounded transition relative group ${
+            activeSidebarView === 'search' ? 'text-white' : 'text-[#858585] hover:text-white'
+          }`}
+          title="Search (Ctrl+Shift+F)"
+        >
+          <Search size={20} strokeWidth={1.5} />
+          {activeSidebarView === 'search' && (
+            <div className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-white rounded-r" />
+          )}
+        </button>
+
+        {/* Source Control */}
+        <button
+          onClick={() => handleNav('git')}
+          className={`p-2.5 rounded transition relative group ${
+            activeSidebarView === 'git' ? 'text-white' : 'text-[#858585] hover:text-white'
+          }`}
+          title="Source Control (Ctrl+Shift+G)"
+        >
+          <GitBranch size={20} strokeWidth={1.5} />
+          {activeSidebarView === 'git' && (
+            <div className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-white rounded-r" />
+          )}
+        </button>
+
+        {/* Run & Debug */}
+        <button
+          onClick={() => handleNav('search')}
+          className="p-2.5 rounded text-[#858585] hover:text-white transition"
+          title="Run & Debug"
+        >
+          <PlayCircle size={20} strokeWidth={1.5} />
+        </button>
+
+        {/* Extensions */}
+        <button
+          onClick={() => handleNav('settings')}
+          className="p-2.5 rounded text-[#858585] hover:text-white transition"
+          title="Extensions & Plugins"
+        >
+          <LayoutGrid size={20} strokeWidth={1.5} />
+        </button>
       </div>
 
       <div>
+        {/* Settings */}
         <button
-          onClick={() => setActiveSidebarView('settings')}
-          className={`p-2.5 rounded-lg transition ${
+          onClick={() => handleNav('settings')}
+          className={`p-2.5 rounded transition ${
             activeSidebarView === 'settings' 
-              ? 'text-white bg-ide-active' 
-              : 'text-ide-muted hover:text-white hover:bg-ide-hover'
+              ? 'text-white' 
+              : 'text-[#858585] hover:text-white'
           }`}
-          title="Settings"
+          title="Manage Settings"
         >
-          <Sliders size={18} />
+          <Settings size={20} strokeWidth={1.5} />
         </button>
       </div>
     </aside>
   );
 };
-

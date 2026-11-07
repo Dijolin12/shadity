@@ -1,3 +1,9 @@
+export interface OllamaModelItem {
+  name: string;
+  size: number;
+  modified_at: string;
+}
+
 export class OllamaProvider {
   private endpointUrl: string;
   private modelName: string;
@@ -5,6 +11,19 @@ export class OllamaProvider {
   constructor(endpointUrl: string = 'http://localhost:11434', modelName: string = 'deepseek-r1:latest') {
     this.endpointUrl = endpointUrl;
     this.modelName = modelName;
+  }
+
+  // Detect whether Ollama is running and get list of installed models
+  static async listLocalModels(endpointUrl: string = 'http://localhost:11434'): Promise<{ running: boolean; models: string[] }> {
+    try {
+      const res = await fetch(`${endpointUrl}/api/tags`, { signal: AbortSignal.timeout(2000) });
+      if (!res.ok) return { running: false, models: [] };
+      const data = await res.json();
+      const models = (data.models || []).map((m: OllamaModelItem) => m.name);
+      return { running: true, models };
+    } catch {
+      return { running: false, models: [] };
+    }
   }
 
   async generateAutonomousResponse(
@@ -28,7 +47,7 @@ export class OllamaProvider {
     });
 
     if (!res.ok) {
-      throw new Error(`Ollama error: ${res.statusText}`);
+      throw new Error(`Ollama service error (${res.statusText}). Make sure Ollama is running at ${this.endpointUrl}`);
     }
 
     const reader = res.body?.getReader();
@@ -48,7 +67,7 @@ export class OllamaProvider {
             fullText += content;
             if (onChunk) onChunk(content);
           } catch {
-            // Ignore parse errors on partial stream chunks
+            // Ignore partial streaming chunks
           }
         }
       }
@@ -57,4 +76,3 @@ export class OllamaProvider {
     return fullText;
   }
 }
-

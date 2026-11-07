@@ -1,34 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useIdeStore } from '../stores/useIdeStore';
 import { api, AgentStreamEvent } from '../services/api';
-import { ArtifactView } from './ArtifactView';
 import { 
-  Send, 
-  Sparkles, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  Paperclip,
+  Plus, 
+  ArrowUp, 
+  ChevronRight, 
+  ChevronDown, 
+  Search, 
+  Columns, 
+  ThumbsUp, 
+  ThumbsDown, 
+  RotateCcw, 
   Check,
-  X,
-  Bot
+  Clock,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
-export const AgentPanel: React.FC = () => {
+interface AgentPanelProps {
+  onOpenReview?: () => void;
+}
+
+export const AgentPanel: React.FC<AgentPanelProps> = ({ onOpenReview }) => {
   const [input, setInput] = useState('');
+  const [showModelMenu, setShowModelMenu] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<any>(null);
+
   const { 
     messages, 
     addMessage, 
     updateLastMessage,
     isAgentRunning, 
     setIsAgentRunning, 
-    pendingApprovals,
-    resolveApproval,
-    agentMode,
-    modelConfig,
-    addTerminalLog,
-    loadWorkspaceFiles
+    modelConfig, 
+    setModelConfig, 
+    addTerminalLog, 
+    loadWorkspaceFiles 
   } = useIdeStore();
+
+  // Real live timer that counts actual thinking seconds
+  useEffect(() => {
+    if (isAgentRunning) {
+      setElapsedSeconds(0);
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isAgentRunning]);
 
   const handleSend = () => {
     if (!input.trim() || isAgentRunning) return;
@@ -56,6 +80,8 @@ export const AgentPanel: React.FC = () => {
       plan: [],
     });
 
+    console.log('[CodePilot Agent] Sending prompt:', userPrompt, 'with model:', modelConfig.model);
+
     api.streamAgentPrompt(
       {
         prompt: userPrompt,
@@ -65,6 +91,7 @@ export const AgentPanel: React.FC = () => {
         endpointUrl: modelConfig.endpointUrl,
       },
       (event: AgentStreamEvent) => {
+        console.log('[CodePilot Agent Event]:', event);
         if (event.type === 'stream_chunk') {
           updateLastMessage((msg) => ({
             ...msg,
@@ -89,7 +116,7 @@ export const AgentPanel: React.FC = () => {
         } else if (event.type === 'tool_execution_end') {
           const { toolCall, result } = event.payload;
           addTerminalLog(`[AGENT TOOL RESULT]: ${toolCall.name} -> ${result?.success ? 'Success' : 'Failed'}`);
-          loadWorkspaceFiles(); // Refresh file tree in case files were created/edited
+          loadWorkspaceFiles();
           updateLastMessage((msg) => ({
             ...msg,
             toolCalls: (msg.toolCalls || []).map((t) =>
@@ -103,127 +130,126 @@ export const AgentPanel: React.FC = () => {
           updateLastMessage((msg) => ({
             ...msg,
             isStreaming: false,
-            content: event.error ? msg.content + `\n\n*(Error: ${event.error})*` : msg.content,
+            content: event.error ? msg.content + `\n\n*(Error: ${event.error})*` : (msg.content || event.payload?.finalResponse || ''),
           }));
-          addTerminalLog('[AGENT TASK FINISHED]');
         }
       },
       (err) => {
+        console.error('[CodePilot Connection Error]:', err);
         setIsAgentRunning(false);
         updateLastMessage((msg) => ({
           ...msg,
           isStreaming: false,
-          content: msg.content + `\n\n*(Connection error: ${err.message || 'Make sure the backend is running on port 4000'})*`,
+          content: msg.content + `\n\n*(Connection error: ${err.message || 'Make sure backend is running on port 4000'})*`,
         }));
       }
     );
   };
 
   return (
-    <div className="w-80 bg-ide-panel border-l border-ide-border flex flex-col h-full shrink-0 select-none">
-      {/* Agent Panel Header */}
-      <div className="h-9 px-3 border-b border-ide-border flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5 font-medium text-white">
-          <Sparkles size={14} className="text-ide-agent" />
-          <span>Antigravity Agent</span>
+    <div className="w-[420px] bg-[#181818] border-l border-[#252526] flex flex-col h-full shrink-0 select-none text-[13px] text-[#cccccc]">
+      {/* Antigravity Agent Tab Header */}
+      <div className="h-9 px-2 border-b border-[#252526] flex items-center justify-between text-xs bg-[#181818]">
+        <div className="flex items-center gap-1.5 overflow-hidden">
+          <Search size={13} className="text-[#858585] shrink-0" />
+          <span className="text-[#858585] truncate">S... /</span>
+          <span className="text-white font-medium truncate">CodePilot Agent</span>
+          <button className="text-[#858585] hover:text-white px-1">
+            <Plus size={12} />
+          </button>
         </div>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-ide-agent/20 text-ide-agent border border-ide-agent/30 font-mono">
-          {agentMode.toUpperCase()}
-        </span>
+
+        <div className="flex items-center gap-1 text-[#858585]">
+          <button className="p-1 hover:text-white rounded hover:bg-[#2a2d2e] transition" title="Split Panel">
+            <Columns size={13} />
+          </button>
+        </div>
       </div>
 
-      {/* Pending Approvals Gate */}
-      {pendingApprovals.length > 0 && (
-        <div className="p-2 bg-amber-500/10 border-b border-amber-500/30 flex flex-col gap-2">
-          <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold">
-            <AlertCircle size={13} />
-            <span>Action Requires User Approval</span>
-          </div>
-          {pendingApprovals.map(app => (
-            <div key={app.id} className="bg-ide-bg p-2 rounded border border-ide-border text-xs flex flex-col gap-1.5">
-              <span className="font-mono text-ide-text text-[11px]">Tool: {app.toolName}</span>
-              <pre className="text-[10px] text-ide-muted bg-ide-panel p-1 rounded overflow-x-auto">
-                {JSON.stringify(app.args, null, 2)}
-              </pre>
-              <div className="flex justify-end gap-1.5 mt-1">
-                <button
-                  onClick={() => resolveApproval(app.id, true)}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-ide-success/20 text-ide-success border border-ide-success/30 hover:bg-ide-success/30 text-[10px]"
-                >
-                  <Check size={11} /> Allow
-                </button>
-                <button
-                  onClick={() => resolveApproval(app.id, false)}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-ide-error/20 text-ide-error border border-ide-error/30 hover:bg-ide-error/30 text-[10px]"
-                >
-                  <X size={11} /> Deny
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Message & Tool Calling Timeline */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {messages.map(msg => (
-          <div key={msg.id} className="text-xs space-y-2">
-            <div className="flex items-center gap-1.5 text-ide-muted font-medium text-[11px]">
-              {msg.role === 'assistant' ? (
-                <>
-                  <Bot size={13} className="text-ide-agent" />
-                  <span className="text-ide-agent">CodePilot</span>
-                </>
+      {/* Messages Timeline */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg) => {
+          const changedFiles = msg.toolCalls?.filter(t => t.toolName === 'write_file' || t.toolName === 'edit_file') || [];
+          return (
+            <div key={msg.id} className="space-y-2">
+              {msg.role === 'user' ? (
+                /* User Bubble */
+                <div className="bg-[#2a2d2e]/80 border border-[#383b3d] p-3 rounded-lg text-white">
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                </div>
               ) : (
-                <span className="text-ide-text">You</span>
-              )}
-            </div>
-
-            <div className={`p-2.5 rounded-lg leading-relaxed ${
-              msg.role === 'assistant' 
-                ? 'bg-ide-bg border border-ide-border text-ide-text' 
-                : 'bg-ide-accent/15 border border-ide-accent/30 text-white ml-2'
-            }`}>
-              <div className="whitespace-pre-wrap">{msg.content || (msg.isStreaming ? 'Thinking...' : '')}</div>
-
-              {/* Artifact Card rendering */}
-              {msg.artifact && (
-                <ArtifactView
-                  artifact={msg.artifact}
-                  onApply={() => {
-                    msg.artifact?.files.forEach(f => {
-                      api.writeFile(f.path, f.content);
-                    });
-                    loadWorkspaceFiles();
-                  }}
-                />
-              )}
-
-              {/* Tool calls indicator badges */}
-              {msg.toolCalls && msg.toolCalls.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-ide-border space-y-1">
-                  <span className="font-semibold text-[10px] uppercase tracking-wider text-ide-muted">
-                    Autonomous Actions
-                  </span>
-                  {msg.toolCalls.map((t, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-[11px] bg-ide-panel p-1.5 rounded font-mono border border-ide-border">
-                      {t.status === 'running' && <Clock size={12} className="text-ide-agent animate-spin" />}
-                      {t.status === 'completed' && <CheckCircle2 size={12} className="text-ide-success" />}
-                      {t.status === 'failed' && <AlertCircle size={12} className="text-ide-error" />}
-                      <span className="text-ide-accent font-semibold">{t.toolName}</span>
-                      <span className="truncate text-ide-muted">{JSON.stringify(t.args)}</span>
+                /* Agent Response */
+                <div className="space-y-2 text-[#cccccc] leading-relaxed">
+                  {/* Real Live Elapsed Stopwatch when running */}
+                  {msg.isStreaming && (
+                    <div className="flex items-center gap-1 text-xs text-[#858585]">
+                      <Clock size={12} className="animate-spin text-[#007acc]" />
+                      <span>Thinking... ({elapsedSeconds}s)</span>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Real Markdown Text */}
+                  {msg.content && (
+                    <div className="whitespace-pre-wrap text-[13px] space-y-2">
+                      {msg.content}
+                    </div>
+                  )}
+
+                  {/* Real Tool Calls Badges (Shown ONLY when actual tools are run) */}
+                  {msg.toolCalls && msg.toolCalls.length > 0 && (
+                    <div className="space-y-1.5 mt-2">
+                      <div className="text-[10px] font-mono text-[#858585] uppercase tracking-wider">
+                        Autonomous Actions ({msg.toolCalls.length})
+                      </div>
+                      {msg.toolCalls.map((tool, i) => (
+                        <div key={i} className="flex items-center gap-1.5 bg-[#252526] p-1.5 rounded font-mono text-[11px] border border-[#333333]">
+                          {tool.status === 'running' && <Clock size={12} className="text-[#007acc] animate-spin" />}
+                          {tool.status === 'completed' && <CheckCircle2 size={12} className="text-green-400" />}
+                          {tool.status === 'failed' && <AlertCircle size={12} className="text-red-400" />}
+                          <span className="text-white font-semibold">{tool.toolName}</span>
+                          <span className="text-[#858585] truncate">{JSON.stringify(tool.args)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Review Drawer - Shown ONLY if actual files were modified */}
+                  {changedFiles.length > 0 && (
+                    <div className="bg-[#1e1e1e] border border-[#2d2d2d] rounded-lg p-2.5 flex items-center justify-between mt-3">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-white font-medium">
+                          {changedFiles.length} file{changedFiles.length > 1 ? 's' : ''} modified
+                        </span>
+                        <ChevronRight size={13} className="text-[#858585]" />
+                      </div>
+                      <button 
+                        onClick={onOpenReview}
+                        className="px-2.5 py-1 rounded bg-[#2a2d2e] text-white text-xs font-medium hover:bg-[#383b3d] border border-[#3c3c3c] transition"
+                      >
+                        Review
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Feedback icons */}
+                  {!msg.isStreaming && msg.content && (
+                    <div className="flex items-center justify-end gap-3 pt-1 text-[#666666] text-xs">
+                      <span>just now</span>
+                      <button className="hover:text-white transition"><ThumbsUp size={12} /></button>
+                      <button className="hover:text-white transition"><ThumbsDown size={12} /></button>
+                      <button className="hover:text-white transition"><RotateCcw size={12} /></button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Input Box */}
-      <div className="p-2 border-t border-ide-border bg-ide-sidebar">
-        <div className="bg-ide-bg border border-ide-border focus-within:border-ide-agent rounded-lg p-2 transition">
+      {/* Antigravity Input Box */}
+      <div className="p-3 bg-[#181818]">
+        <div className="bg-[#1e1e1e] border border-[#2d2d2d] focus-within:border-[#404040] rounded-xl p-3 shadow-lg flex flex-col justify-between min-h-[95px]">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -233,21 +259,99 @@ export const AgentPanel: React.FC = () => {
                 handleSend();
               }
             }}
-            placeholder="Ask CodePilot to create components, edit files, or debug..."
-            rows={3}
-            className="w-full bg-transparent text-xs text-white placeholder-ide-muted focus:outline-none resize-none font-sans"
+            placeholder="Ask anything, @ to mention, / for actions"
+            rows={2}
+            className="w-full bg-transparent text-[13px] text-white placeholder-[#666666] focus:outline-none resize-none font-sans"
           />
-          <div className="flex items-center justify-between pt-1 border-t border-ide-border/50 text-ide-muted">
-            <button className="hover:text-white p-1 rounded transition" title="Attach file context">
-              <Paperclip size={13} />
+
+          <div className="flex items-center justify-between pt-2 text-xs relative">
+            <button className="text-[#858585] hover:text-white p-1 rounded hover:bg-[#2a2d2e] transition" title="Add Context">
+              <Plus size={15} />
             </button>
+
+            {/* Model Selector */}
+            <div className="relative">
+              <button
+                onClick={() => setShowModelMenu(prev => !prev)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded bg-transparent hover:bg-[#2a2d2e] text-[#999999] hover:text-white transition text-xs font-medium"
+              >
+                <span>{modelConfig.model === 'antigravity-local' ? 'Antigravity Local AI (Zero API)' : modelConfig.model === 'gemini-3.8-flash' ? 'Gemini 3.8 Flash Low' : modelConfig.model}</span>
+                <ChevronDown size={12} />
+              </button>
+
+              {showModelMenu && (
+                <div className="absolute bottom-8 left-0 w-64 bg-[#252526] border border-[#383838] rounded-lg shadow-2xl py-1 z-50 text-xs">
+                  <div className="px-3 py-1 text-[10px] uppercase font-mono text-[#007acc] font-bold">Built-in (Zero API Required)</div>
+                  <button
+                    onClick={() => {
+                      setModelConfig({ provider: 'gemini', model: 'antigravity-local' });
+                      setShowModelMenu(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-[#094771] flex items-center justify-between ${
+                      modelConfig.model === 'antigravity-local' ? 'text-white font-medium bg-[#094771]/50' : 'text-[#cccccc]'
+                    }`}
+                  >
+                    <div>
+                      <span className="font-semibold">Antigravity Local AI</span>
+                      <div className="text-[10px] text-[#858585]">100% Free • Unlimited • No API key</div>
+                    </div>
+                    {modelConfig.model === 'antigravity-local' && <Check size={12} />}
+                  </button>
+
+                  <div className="px-3 py-1 text-[10px] uppercase font-mono text-[#777777] border-t border-[#383838] mt-1">Google Gemini Cloud</div>
+                  <button
+                    onClick={() => {
+                      setModelConfig({ provider: 'gemini', model: 'gemini-3.8-flash' });
+                      setShowModelMenu(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-[#094771] flex items-center justify-between ${
+                      modelConfig.model === 'gemini-3.8-flash' ? 'text-white font-medium' : 'text-[#cccccc]'
+                    }`}
+                  >
+                    <span>Gemini 3.8 Flash Low</span>
+                    {modelConfig.model === 'gemini-3.8-flash' && <Check size={12} />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setModelConfig({ provider: 'gemini', model: 'gemini-2.0-flash' });
+                      setShowModelMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-[#094771] text-[#cccccc]"
+                  >
+                    <span>Gemini 2.0 Flash</span>
+                  </button>
+
+                  <div className="px-3 py-1 text-[10px] uppercase font-mono text-[#777777] border-t border-[#383838] mt-1">Ollama Local</div>
+                  <button
+                    onClick={() => {
+                      setModelConfig({ provider: 'ollama', model: 'deepseek-r1:latest' });
+                      setShowModelMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-[#094771] text-[#cccccc]"
+                  >
+                    <span>DeepSeek-R1 (Local)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setModelConfig({ provider: 'ollama', model: 'qwen2.5-coder:latest' });
+                      setShowModelMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-[#094771] text-[#cccccc]"
+                  >
+                    <span>Qwen 2.5 Coder (Local)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Circular Send Arrow */}
             <button
               onClick={handleSend}
               disabled={isAgentRunning || !input.trim()}
-              className="px-2.5 py-1 rounded bg-ide-agent text-white text-[11px] font-medium flex items-center gap-1 hover:bg-ide-agent/90 disabled:opacity-40 transition"
+              className="w-6 h-6 rounded-full bg-[#2d2d2d] hover:bg-[#404040] disabled:opacity-40 text-white flex items-center justify-center transition"
             >
-              <Send size={11} />
-              <span>Send</span>
+              <ArrowUp size={13} />
             </button>
           </div>
         </div>
