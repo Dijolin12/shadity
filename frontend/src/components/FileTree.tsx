@@ -156,6 +156,12 @@ export const FileTree: React.FC<FileTreeProps> = ({ onOpenProjectWizard }) => {
         body: JSON.stringify({ path, content: '' }),
       });
       openFile({ path, name: newItemName.trim(), content: '' });
+    } else if (creatingType === 'folder') {
+      await fetch('/api/terminal/exec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: `mkdir "${newItemName.trim()}"` }),
+      }).catch(() => {});
     }
     setNewItemName('');
     setCreatingType(null);
