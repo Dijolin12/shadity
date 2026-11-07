@@ -1,7 +1,12 @@
 {
   "lastOpenedProject": "C:\\Users\\dijol\\OneDrive\\Desktop\\Shadity",
-  "openTabs": [],
-  "activeTabPath": null,
+  "openTabs": [
+    {
+      "path": "backend/package-lock.json",
+      "name": "package-lock.json"
+    }
+  ],
+  "activeTabPath": "backend/package-lock.json",
   "conversations": [
     {
       "id": "msg-welcome",
