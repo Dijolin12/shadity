@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Full-Stack Todo App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-card">
+    <header class="header">
+      <div class="logo">✓</div>
+      <h1>Antigravity Todo List</h1>
+      <p class="subtitle">Full-Stack App with Save & Delete REST APIs</p>
+    </header>
+
+    <form id="todo-form" class="input-group">
+      <input type="text" id="todo-input" placeholder="What needs to be done?" required autocomplete="off" />
+      <button type="submit" id="add-btn">Add Task</button>
+    </form>
+
+    <div class="list-container">
+      <ul id="todo-list"></ul>
+    </div>
+
+    <footer class="footer">
+      <span id="task-count">0 tasks</span>
+      <span class="badge">Node.js + REST API</span>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
