@@ -1,0 +1,31 @@
+{
+  "name": "codepilot-ai-ide",
+  "version": "1.0.0",
+  "description": "Antigravity & Gemini inspired AI-powered Autonomous Coding IDE",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev:frontend": "npm.cmd --prefix frontend run dev",
+    "dev:backend": "npm.cmd --prefix backend run dev",
+    "dev": "concurrently \"npm.cmd --prefix backend run dev\" \"npm.cmd --prefix frontend run dev\"",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "electron:dev": "npm.cmd run build:electron && electron .",
+    "build": "npm.cmd --prefix frontend run build && npm.cmd --prefix backend run build && npm.cmd run build:electron"
+  },
+  "keywords": [
+    "ai-ide",
+    "antigravity",
+    "gemini",
+    "monaco",
+    "agentic-coding"
+  ],
+  "author": "CodePilot AI",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "concurrently": "^9.1.2",
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.3"
+  }
+}
