@@ -75,23 +75,30 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ onOpenDebugger }) 
     });
 
     let currLine = '';
+    const getPrompt = () => `PS C:\\Users\\dijol\\OneDrive\\Desktop\\${useIdeStore.getState().projectName}> `;
+
     term.onData(data => {
       if (data === '\r') {
         term.writeln('');
         if (currLine.trim() === 'clear') {
           term.clear();
-          term.write(`PS C:\\Users\\dijol\\OneDrive\\Desktop\\${projectName}> `);
+          term.write(getPrompt());
         } else if (currLine.trim().length > 0) {
           terminalSocket.sendCommand(currLine.trim());
         } else {
-          term.write(`PS C:\\Users\\dijol\\OneDrive\\Desktop\\${projectName}> `);
+          term.write(getPrompt());
         }
         currLine = '';
-      } else if (data === '\u007F') {
+      } else if (data === '\u007F' || data === '\b') {
         if (currLine.length > 0) {
           currLine = currLine.slice(0, -1);
           term.write('\b \b');
         }
+      } else if (data === '\u0003') {
+        // Ctrl + C
+        currLine = '';
+        term.writeln('^C');
+        term.write(getPrompt());
       } else {
         currLine += data;
         term.write(data);

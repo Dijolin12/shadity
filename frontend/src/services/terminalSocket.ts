@@ -28,9 +28,11 @@ export class TerminalSocket {
           const parsed = JSON.parse(event.data);
           if (parsed.type === 'command_result') {
             const out = parsed.result?.output || parsed.result?.error || '';
-            this.onDataCallback?.(out.replace(/\n/g, '\r\n') + '\r\n$ ');
+            const prompt = `\r\nPS ${window.location.pathname}> `;
+            this.onDataCallback?.(out.replace(/\r?\n/g, '\r\n') + prompt);
           } else if (parsed.type === 'welcome') {
-            this.onDataCallback?.(`${parsed.message}\r\n$ `);
+            const prompt = `\r\nPS ${window.location.pathname}> `;
+            this.onDataCallback?.(`\x1b[36m${parsed.message}\x1b[0m\r\n${prompt}`);
           }
         } catch {
           this.onDataCallback?.(event.data);
