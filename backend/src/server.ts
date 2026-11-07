@@ -4,8 +4,12 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { exec } from 'child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { AgentEngine } from './agent/engine';
 import { AgentTools } from './agent/tools';
 import { GitManager } from './agent/git';

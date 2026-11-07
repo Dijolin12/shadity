@@ -6,3 +6,4 @@ if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $f.SelectedPath
 }
+
