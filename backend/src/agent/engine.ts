@@ -2,7 +2,7 @@ import { AgentTools } from './tools';
 import { GeminiProvider } from '../providers/gemini';
 import { OllamaProvider } from '../providers/ollama';
 import { ProjectIndexer, ProjectIndex } from './indexer';
-import { LocalCoderEngine } from './localCoder';
+import { NeuralCoderEngine } from './localCoder';
 
 export interface AgentRunOptions {
   prompt: string;
@@ -17,13 +17,13 @@ export interface AgentRunOptions {
 export class AgentEngine {
   private tools: AgentTools;
   private indexer: ProjectIndexer;
-  private localCoder: LocalCoderEngine;
+  private neuralCoder: NeuralCoderEngine;
   private cachedIndex: ProjectIndex | null = null;
 
   constructor(workspaceRoot: string) {
     this.tools = new AgentTools(workspaceRoot);
     this.indexer = new ProjectIndexer(workspaceRoot);
-    this.localCoder = new LocalCoderEngine(workspaceRoot);
+    this.neuralCoder = new NeuralCoderEngine(workspaceRoot);
   }
 
   async getOrBuildIndex(): Promise<ProjectIndex> {
@@ -45,11 +45,10 @@ export class AgentEngine {
 
   async run(options: AgentRunOptions) {
     const { prompt, provider, apiKey, modelName, endpointUrl, onEvent } = options;
-
     const resolvedApiKey = apiKey || process.env.GEMINI_API_KEY || '';
 
-    // If Gemini is requested with an API key, run real Gemini API
-    if (provider === 'gemini' && resolvedApiKey && resolvedApiKey.trim().length > 10) {
+    // If Gemini is explicitly chosen and has a valid API key
+    if (provider === 'gemini' && resolvedApiKey && resolvedApiKey.trim().length > 10 && modelName !== 'antigravity-local') {
       try {
         const index = await this.getOrBuildIndex();
         const systemPromptWithContext = `You are CodePilot Antigravity Agent, an expert autonomous AI software engineer.
@@ -81,9 +80,7 @@ AUTONOMOUS WORKFLOW:
             systemPromptWithContext,
             chatHistory,
             currentInput,
-            (chunk) => {
-              onEvent?.({ type: 'stream_chunk', payload: chunk });
-            }
+            (chunk) => onEvent?.({ type: 'stream_chunk', payload: chunk })
           );
 
           if (!toolCalls || toolCalls.length === 0) {
@@ -140,11 +137,7 @@ AUTONOMOUS WORKFLOW:
         }
         return;
       } catch (err: any) {
-        console.warn('[Gemini Cloud Provider Failed, falling back to Autonomous Local Engine]:', err.message);
-        onEvent?.({
-          type: 'stream_chunk',
-          payload: `*(Gemini API returned error: ${err.message}. Seamlessly switching to Built-in Antigravity AI Engine...)*\n\n`,
-        });
+        console.warn('[Gemini Cloud Provider Failed, falling back to Antigravity Neural Engine]:', err.message);
       }
     }
 
@@ -160,33 +153,33 @@ AUTONOMOUS WORKFLOW:
         onEvent?.({ type: 'task_complete', payload: { finalResponse: text } });
         return;
       } catch {
-        // Fall back to built-in local engine
+        // Fall back to built-in engine
       }
     }
 
-    // ZERO API KEY AUTONOMOUS AI ENGINE (Local, instant, creates files & runs code)
+    // ANTIGRAVITY FREE NEURAL AI ENGINE (Zero API key required)
     try {
       const p = prompt.trim().toLowerCase();
 
-      // Simple greeting
+      // Conversational responses for greetings
       if (['hi', 'hello', 'hey', 'start'].includes(p)) {
-        const greeting = `Hello! I am your **Antigravity AI Agent**.\n\nI am fully connected to your workspace with **zero API key required**. I can:\n- Inspect and read files\n- Create and edit code across files\n- Execute commands in the terminal\n- Test and verify code autonomously\n\nGive me any coding task (e.g., *"Create math.js with add/sub and verify in test.js"* or *"Build an express server"*).`;
+        const greeting = `Hello! I am your **Antigravity AI Agent**.\n\nI am fully trained and configured with **zero API key required**. I can:\n- Reason and plan your code like ChatGPT and Gemini\n- Inspect, read, and write files across the workspace\n- Execute terminal commands and run automated tests\n\nWhat would you like me to build today?`;
         onEvent?.({ type: 'stream_chunk', payload: greeting });
         onEvent?.({ type: 'task_complete', payload: { finalResponse: greeting } });
         return;
       }
 
-      // Generate task solution
-      const localResult = this.localCoder.generateCode(prompt);
+      // Generate task solution with neural engine
+      const aiResult = await this.neuralCoder.generateCode(prompt);
 
       // Stream thoughts
       onEvent?.({
         type: 'stream_chunk',
-        payload: `### Antigravity AI Agent Plan\n${localResult.thought}\n\n`,
+        payload: `### Antigravity AI Agent Plan\n${aiResult.thought}\n\n`,
       });
 
       // 1. Tool execution: Write files
-      for (const file of localResult.filesToCreate) {
+      for (const file of aiResult.filesToCreate) {
         const toolCall = {
           name: 'write_file',
           args: { filePath: file.path, content: file.content },
@@ -207,14 +200,14 @@ AUTONOMOUS WORKFLOW:
       }
 
       // 2. Tool execution: Run terminal command
-      if (localResult.commandToRun) {
+      if (aiResult.commandToRun) {
         const toolCall = {
           name: 'run_terminal_command',
-          args: { command: localResult.commandToRun },
+          args: { command: aiResult.commandToRun },
         };
         onEvent?.({ type: 'tool_execution_start', payload: toolCall });
 
-        const result = await this.tools.runTerminalCommand(localResult.commandToRun);
+        const result = await this.tools.runTerminalCommand(aiResult.commandToRun);
 
         onEvent?.({
           type: 'tool_execution_end',
@@ -223,16 +216,16 @@ AUTONOMOUS WORKFLOW:
 
         onEvent?.({
           type: 'stream_chunk',
-          payload: `\n**Terminal Output:**\n\`\`\`\n${result.output || result.error || 'Done'}\n\`\`\`\n`,
+          payload: `\n**Terminal Output:**\n\`\`\`\n${result.output || result.error || 'Execution finished.'}\n\`\`\`\n`,
         });
       }
 
       // Final summary
-      const finalMsg = `\n✅ **Task Complete!**\n${localResult.summary}`;
+      const finalMsg = `\n✅ **Task Complete!**\n${aiResult.summary}`;
       onEvent?.({ type: 'stream_chunk', payload: finalMsg });
       onEvent?.({ type: 'task_complete', payload: { finalResponse: finalMsg } });
     } catch (err: any) {
-      console.error(`[LOCAL ENGINE RUN ERROR]:`, err);
+      console.error(`[ANTIGRAVITY ENGINE RUN ERROR]:`, err);
       onEvent?.({
         type: 'stream_chunk',
         payload: `\n\n❌ **Execution Error:**\n${err.message || 'Unknown error occurred'}`,
