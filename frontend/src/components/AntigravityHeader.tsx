@@ -89,31 +89,22 @@ export const AntigravityHeader: React.FC<AntigravityHeaderProps> = ({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ path }),
             });
+            const folderName = path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'Workspace';
+            useIdeStore.getState().setProject(folderName, path);
             loadWorkspaceFiles();
           }
         } else {
-          const customPath = prompt(
-            'Enter the absolute folder path on your computer to open in Antigravity:',
-            'C:\\Users\\dijol\\OneDrive\\Desktop\\Shadity'
-          );
-          if (customPath && customPath.trim()) {
-            try {
-              const res = await fetch('/api/workspace/set', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: customPath.trim() }),
-              });
-              const data = await res.json();
-              if (data.success) {
-                const folderName = customPath.trim().replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'Workspace';
-                useIdeStore.getState().setProject(folderName, customPath.trim());
-                loadWorkspaceFiles();
-              } else {
-                alert('Folder path not found or inaccessible: ' + (data.error || ''));
-              }
-            } catch (err: any) {
-              alert('Failed to switch workspace: ' + err.message);
+          // Trigger the native Windows folder picker dialog from the backend
+          try {
+            const res = await fetch('/api/workspace/pick-dialog', { method: 'POST' });
+            const data = await res.json();
+            if (data.success && data.workspace) {
+              const folderName = data.workspace.replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'Workspace';
+              useIdeStore.getState().setProject(folderName, data.workspace);
+              loadWorkspaceFiles();
             }
+          } catch (err: any) {
+            console.error('Failed to open native picker dialog:', err);
           }
         }
         break;

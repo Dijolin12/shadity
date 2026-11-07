@@ -53,6 +53,37 @@ app.post('/api/workspace/set', (req, res) => {
   res.json({ success: true, workspace: WORKSPACE_DIR });
 });
 
+// Native Windows / System Folder Picker Dialog Endpoint
+app.post('/api/workspace/pick-dialog', (req, res) => {
+  // Use PowerShell to trigger the native Windows folder picker
+  const psCommand = `
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = "Select Folder for Antigravity IDE Workspace"
+    $dialog.ShowNewFolderButton = $true
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+      [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+      Write-Output $dialog.SelectedPath
+    }
+  `.replace(/\r?\n\s*/g, ' ');
+
+  exec(`powershell -NoProfile -Command "${psCommand}"`, (error, stdout) => {
+    const selected = (stdout || '').trim();
+    if (!selected || !fs.existsSync(selected)) {
+      return res.json({ canceled: true });
+    }
+
+    WORKSPACE_DIR = path.resolve(selected);
+    tools = new AgentTools(WORKSPACE_DIR);
+    gitManager = new GitManager(WORKSPACE_DIR);
+    agentEngine = new AgentEngine(WORKSPACE_DIR);
+    debuggerEngine = new DebuggerEngine(WORKSPACE_DIR);
+    sessionStore = new SessionStore(WORKSPACE_DIR);
+    console.log('[Workspace Switched via Native Dialog]:', WORKSPACE_DIR);
+    res.json({ success: true, workspace: WORKSPACE_DIR });
+  });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', name: 'CodePilot AI IDE Backend', workspace: WORKSPACE_DIR });
